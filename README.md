@@ -14,7 +14,9 @@ The application will have an option to play with another player through networki
 
 <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/HuaRongDao.jpg/1024px-HuaRongDao.jpg" width="200"/>
 <!-- [![Huarong Lane picture](https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/HuaRongDao.jpg/1024px-HuaRongDao.jpg)](https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/HuaRongDao.jpg/1024px-HuaRongDao.jpg) -->
+
 Reference and image source:
+
 [Wikipedia page for Klotski](https://en.wikipedia.org/wiki/Klotski)
 
 Contributors: Dun Ma, Jiewen Yang, Mohan Li, Jinyi Mu
