@@ -50,4 +50,3 @@ initialPosition = Game {
   , name = Nothing
 }
 
--- >>> [1,2,3,4] !! 2
