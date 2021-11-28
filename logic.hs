@@ -26,7 +26,10 @@ data Role
     | Zhaoyun
     | Guanyu
     | Huangzhong
-    | Zu
+    | Zu1
+    | Zu2
+    | Zu3
+    | Zu4
     deriving (Eq, Show)
 
 -- grid[x][y] stands for the top left tile of current character
@@ -43,8 +46,8 @@ initialPosition = Game {
   grid = [[Zhangfei,Caocao,Caocao,Machao],
           [Zhangfei,Caocao,Caocao,Machao],
           [Zhaoyun,Guanyu,Guanyu,Huangzhong],
-          [Zhaoyun,Zu,Zu,Huangzhong],
-          [Zu,Nothing,Nothing,Zu]]
+          [Zhaoyun,Zu2,Zu3,Huangzhong],
+          [Zu1,Nothing,Nothing,Zu4]]
   , step = 0
   , status = False,
   , name = Nothing
