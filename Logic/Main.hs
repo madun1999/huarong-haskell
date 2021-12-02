@@ -5,17 +5,12 @@ import Control.Lens
 import Data.Maybe
 import System.Environment (getProgName)
 
+--  TODO : Check if the player wins the Game
+
 -- >>> [[1,2,3],[4,5,6]] & element 0 . element 1 .~ 9
 -- [[1,9,3],[4,5,6]]
 --
 
--- >>> [["asd",1,"qwe"]] & element 0 . element 1 .~ "qwsx"
--- <interactive>:10853:10: error:
---     • No instance for (Num [Char]) arising from the literal ‘1’
---     • In the expression: 1
---       In the expression: ["asd", 1, "qwe"]
---       In the first argument of ‘(&)’, namely ‘[["asd", 1, "qwe"]]’
---
 main :: IO ()
 main = someFunc
 
@@ -75,10 +70,12 @@ initialPosition = Game {
 }
 
 
-
+-- The move Function
 move :: Game -> Int -> Int -> Direction-> Game
 move game x y direction = 
               Game{grid = moveGrid (grid game) x y direction, step = step game + 1, status = status game, name = name game}
+              
+              
 -- >>> move initialPosition 0 1 Down
 -- Game {grid = [[Zhangfei,Caocao,Caocao,Machao],[Zhangfei,Caocao,Caocao,Machao],[Zhaoyun,Guanyu,Guanyu,Huangzhong],[Zhaoyun,Zu2,Zu3,Huangzhong],[Zu1,Bai,Bai,Zu4]], step = 1, status = False, name = "player"}
 --
