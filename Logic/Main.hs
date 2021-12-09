@@ -284,4 +284,4 @@ moveGuan curGrid x y direction =  do
 
 -- >>> moveGuan (grid initialPosition) 2 1 Up
 -- [[Zhangfei,Caocao,Caocao,Machao],[Zhangfei,Guanyu,Guanyu,Machao],[Zhaoyun,Bai,Bai,Huangzhong],[Zhaoyun,Zu2,Zu3,Huangzhong],[Zu1,Bai,Bai,Zu4]]
---
+
