@@ -3,9 +3,9 @@ module Main where
 import Lib
 import Control.Lens
 import Data.Maybe
-import System.Environment (getProgName)
 
---  TODO : Check if the player wins the Game
+
+
 
 -- >>> [[1,2,3],[4,5,6]] & element 0 . element 1 .~ 9
 -- [[1,9,3],[4,5,6]]
@@ -69,6 +69,12 @@ initialPosition = Game {
  ,name = "player"
 }
 
+setName:: Game -> String -> Game
+setName game s = Game{grid = grid game, step = step game + 1, status = status game, name = s}
+
+
+isWin :: Game -> Bool
+isWin game = grid game !!4 !! 1 == Caocao
 
 -- The move Function
 move :: Game -> Int -> Int -> Direction-> Game
