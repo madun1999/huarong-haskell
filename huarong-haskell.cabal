@@ -37,6 +37,7 @@ library
   build-depends:
       base >=4.7 && <5
     , brick
+    , microlens
     , microlens-th
     , text
     , vty
@@ -54,6 +55,7 @@ executable huarong-haskell-exe
       base >=4.7 && <5
     , brick
     , huarong-haskell
+    , microlens
     , microlens-th
     , text
     , vty
@@ -71,6 +73,7 @@ test-suite huarong-haskell-test
       base >=4.7 && <5
     , brick
     , huarong-haskell
+    , microlens
     , microlens-th
     , text
     , vty
