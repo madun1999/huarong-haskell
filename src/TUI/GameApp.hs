@@ -13,7 +13,7 @@ import Brick
   , withBorderStyle
   , str
   , attrMap, withAttr, emptyWidget, AttrName, on, fg
-  , (<+>), attrName
+  , (<+>), attrName, CursorLocation (cursorLocation)
   )
 
 import Lens.Micro.TH (makeLenses)
@@ -27,7 +27,7 @@ import qualified Graphics.Vty as V
 import Network (Connection, connectionStatus, ConnectionStatus (..))
 import Graphics.Vty
   ( black, cyan, red, blue, yellow, magenta
-  , green, brightBlue, brightCyan, brightGreen, brightYellow
+  , green, brightBlue, brightCyan, brightGreen, brightYellow, brightMagenta
   )
 
 -------------- Menu Types ----------------
@@ -41,7 +41,15 @@ data GameAppState = GameAppState {
   , _duelStatus :: DuelStatus
 }
 
-type CursorPosition = ()
+data CursorPosition = CursorPosition 
+  {
+    _cursorX :: Int
+  , _cursorY :: Int 
+  }
+
+initialCursorPosition :: CursorPosition
+initialCursorPosition = CursorPosition 0 0
+
 data DuelStatus = InProgress | LocalWin | LocalLose | Tie
 
 type Move = ()
@@ -61,7 +69,7 @@ makeLenses ''GameAppState
 ---------- Initial State for the GameApp --------------
 
 initialGameAppState :: Connection -> GameAppState
-initialGameAppState c = GameAppState c () initialPosition initialPosition InProgress
+initialGameAppState c = GameAppState c initialCursorPosition initialPosition initialPosition InProgress
 
 
 ---- Brick App ----
@@ -85,23 +93,28 @@ drawGameApp s = [hBox [
   drawLocalBoard s,
   drawStats s,
   drawOpponentBoard s
-  ], drawCursor s]
+  ]]
 
 
 drawLocalBoard :: GameAppState -> Widget GameAppResourceName
-drawLocalBoard s = B.borderWithLabel (str "Your Game") $ drawGrid (s ^. localGame)
+drawLocalBoard s = B.borderWithLabel (str "Your Game") $ drawGrid (s ^. localGame) $ Just (s ^. cursorPosition)
 
 
 drawOpponentBoard :: GameAppState -> Widget GameAppResourceName
-drawOpponentBoard s = B.borderWithLabel (str "Opponent's Game") $ drawGrid (s ^. opponentGame)
+drawOpponentBoard s = B.borderWithLabel (str "Opponent's Game") $ drawGrid (s ^. opponentGame) Nothing
 
-drawGrid :: Game -> Widget GameAppResourceName
-drawGrid game = vBox [hBox [ drawCell game x y | y <-[0..numCols -1]] | x <- [0..numRows -1]]
+drawGrid :: Game -> Maybe CursorPosition -> Widget GameAppResourceName
+drawGrid game cp = vBox [hBox [ drawCell game x y | y <-[0..numCols -1]] | x <- [0..numRows -1]]
   where
-    drawCell game x y = tileColor (grid game) x y $ C.hCenter $ padAll 1 $  tileStr (grid game) x y
+    drawCell game x y = tileColor (grid game) x y $  C.hCenter $   drawCursorBorder cp x y $ tileStr (grid game) x y
 
-drawCursor :: GameAppState -> Widget GameAppResourceName
-drawCursor s = emptyWidget
+
+
+drawCursorBorder :: Maybe CursorPosition -> Int -> Int -> Widget GameAppResourceName -> Widget GameAppResourceName
+drawCursorBorder (Just (CursorPosition cx cy)) x y 
+    | (cx == x) && (cy == y) = B.border 
+    | otherwise              = padAll 1
+drawCursorBorder Nothing x y = padAll 1
 
 -- drawInfo :: GameAppState -> Widget GameAppResourceName
 -- drawInfo s = vBox
@@ -135,6 +148,7 @@ tileStr grid x y =
       Just Zu4 -> "卒"
       Nothing -> " "
 
+tileColor :: [[Maybe Role]] -> Int -> Int -> Widget n -> Widget n
 tileColor grid x y w = case grid !! x !! y of
   Just Zhangfei -> withAttr zhangfeiAttr $ w
   Just Caocao -> withAttr caocaoAttr $ w
@@ -158,7 +172,7 @@ drawStats s = hLimit 40
          ]
 
 drawInstructions :: Widget GameAppResourceName
-drawInstructions = vBox 
+drawInstructions = padTop (Pad 2) $ vBox 
   [
     str "arrow: move cursor"
   , str "enter: select/deselect/move"
@@ -245,7 +259,7 @@ boardAttrMap = attrMap V.defAttr
   , (zhaoyunAttr, black `on` yellow)
   , (guanyuAttr, black `on` magenta)
   , (huangzhongAttr, black `on` green)
-  , (zu1Attr, black `on` brightBlue)
+  , (zu1Attr, black `on` brightMagenta)
   , (zu2Attr, black `on` brightCyan)
   , (zu3Attr, black `on` brightGreen)
   , (zu4Attr, black `on` brightYellow)
