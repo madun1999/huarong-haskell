@@ -27,9 +27,9 @@ library
   exposed-modules:
       Lib
       Logic
-      TUI.Game
+      Network
+      TUI.GameApp
       TUI.Menu
-      TUI.TUI
   other-modules:
       Paths_huarong_haskell
   hs-source-dirs:
@@ -46,7 +46,6 @@ library
 executable huarong-haskell-exe
   main-is: Main.hs
   other-modules:
-      Main2
       Paths_huarong_haskell
   hs-source-dirs:
       app
