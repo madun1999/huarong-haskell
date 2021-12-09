@@ -1,9 +1,18 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 module Logic where
+import Lens.Micro.TH (makeLenses)
+import Lens.Micro ((^.), (&), (.~))
+
 -- Tiles represent different roles
 type Tile = Maybe Role
 -- use a 5x4 matrix to represent the grid
 type Grid = [[Tile]]
 
+numRows :: Int
+numRows = 5
+numCols :: Int
+numCols = 4
 
 -- status : Caocao already escape or not
 -- name : current player's name
@@ -32,6 +41,8 @@ data Role
     | Zu3
     | Zu4
     deriving (Eq, Show)
+
+makeLenses ''Game
 
 -- grid[x][y] stands for the top left tile of current character
 -- if movement is valid :
