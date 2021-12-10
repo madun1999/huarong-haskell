@@ -1,10 +1,10 @@
 name:                huarong-haskell
 version:             0.1.0.0
-github:              "githubuser/huarong-haskell"
+github:              "madun1999/huarong-haskell"
 license:             BSD3
-author:              "Author name here"
-maintainer:          "example@example.com"
-copyright:           "2021 Author name here"
+author:              "Dun Ma, Jiewen Yang, Mohan Li, Jinyi Mu"
+maintainer:          "madun1999@gmail.com"
+copyright:           "2021 Dun Ma, Jiewen Yang, Mohan Li, Jinyi Mu"
 
 extra-source-files:
 - README.md
