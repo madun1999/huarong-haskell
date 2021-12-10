@@ -27,7 +27,7 @@ import qualified Brick.Widgets.Border.Style as BS
 import qualified Brick.Widgets.Center as C
 import qualified Brick.Util as U
 import qualified Graphics.Vty as V
-import Network (Connection, connectionStatus, ConnectionStatus (..))
+import Client (Connection, connectionStatus, ConnectionStatus (..))
 import Graphics.Vty
   ( black, cyan, red, blue, yellow, magenta
   , green, brightBlue, brightCyan, brightGreen, brightYellow, brightMagenta
