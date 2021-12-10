@@ -26,14 +26,11 @@ dependencies:
 - vty
 - microlens-th
 - microlens
-<<<<<<< HEAD
 - lens
-=======
 - bytestring
 - network-bsd
 - network
 - aeson
->>>>>>> UI
 library:
   source-dirs: src
 
