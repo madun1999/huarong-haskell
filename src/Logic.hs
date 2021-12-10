@@ -52,7 +52,9 @@ data Role
 --      update(status)      
 move :: Game -> Int -> Int -> Direction-> Game
 move game x y direction =
-              Game{grid = moveGrid (grid game) y x direction, step = step game + 1, status = status game, name = name game}
+  let newGrid = moveGrid (grid game) y x direction
+      st  = isWin newGrid
+  in  Game {grid = newGrid, step = step game + 1, status = st, name = name game}
 
 --the initial board
 initialPosition :: Game
@@ -82,8 +84,8 @@ setName game s = Game{grid = grid game, step = step game, status = status game, 
 
 
 
-isWin :: Game -> Bool
-isWin game = grid game !! 4 !! 1 == Just Caocao && grid game !! 4 !! 2 == Just Caocao
+isWin :: Grid -> Bool
+isWin gr = gr !! 4 !! 1 == Just Caocao && gr !! 4 !! 2 == Just Caocao
 
 moveGrid :: Grid -> Int -> Int -> Direction -> Grid
 moveGrid curGrid x y direction = do
