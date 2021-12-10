@@ -10,10 +10,10 @@ import Client
       tableID, ConnectionDetails )
 import Control.Arrow (ArrowLoop (loop))
 import Control.Concurrent (forkIO, threadDelay)
-import Control.Monad (forever, liftM, void)
+import Control.Monad (forever, liftM, void, when)
 import Control.Monad.Fix
 import Data.Maybe (fromMaybe)
-import Graphics.Vty (defaultConfig, mkVty)
+import Graphics.Vty (defaultConfig, mkVty, outputIface, supportsMode, Mode (Mouse), Output (setMode))
 import Lib
 import Logic (Direction (..))
 import TUI.GameApp
@@ -26,6 +26,7 @@ import Lens.Micro ((^.), (&), (.~))
 import qualified Data.Text as T
 import Brick.Forms
 import Data.Text (unpack)
+import Control.Monad.IO.Class (liftIO)
 
 -- main :: IO ()
 -- main = do
@@ -50,12 +51,16 @@ main = do
   conn <- startClient (gameMessageDispatch gameAppChannel) (roomMessageDispatch menuChannel)
   let builder = mkVty defaultConfig
   initialVty <- builder
+  let output = outputIface initialVty
+  when (supportsMode output Mouse) $ liftIO $ setMode output Mouse True  -- enable Mouse
   finalMenuState <- customMain initialVty builder (Just menuChannel) app (initialMenuState conn)
   case menuToConnection finalMenuState of
     Nothing         -> return ()
     Just connection -> do
                     let builder = mkVty defaultConfig
                     initialVty <- builder
+                    let output = outputIface initialVty
+                    when (supportsMode output Mouse) $ liftIO $ setMode output Mouse True -- enable Mouse
                     let levelStr = unpack $ formState (finalMenuState ^. connectionInfoForm) ^. level 
                     finalGameState <-
                         customMain initialVty builder (Just gameAppChannel) gameApp (initialGameAppState connection levelStr)

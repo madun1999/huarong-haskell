@@ -16,7 +16,7 @@ import Brick
   , withBorderStyle
   , str
   , attrMap, withAttr, emptyWidget, AttrName, on, fg
-  , (<+>), attrName, CursorLocation (cursorLocation)
+  , (<+>), attrName, CursorLocation (cursorLocation), clickable
   )
 
 import Lens.Micro.TH (makeLenses)
@@ -33,6 +33,7 @@ import Graphics.Vty
   , green, brightBlue, brightCyan, brightGreen, brightYellow, brightMagenta
   )
 import Control.Monad.IO.Class (MonadIO(liftIO))
+import Data.Maybe (isNothing)
 
 
 -------------- Menu Types ----------------
@@ -74,7 +75,7 @@ data GameAppEvent =
 
 -- Resource
 data GameAppResourceName =
-  MenuServerIPField | MenuTableIDField
+  Cell Int Int             -- x y
   deriving (Eq, Ord, Show)
 
 -- Convenient Lenses
@@ -124,7 +125,8 @@ drawGrid game cp = vBox [hBox [ drawCell game x y cp | x <-[0..numCols -1]] | y 
 
 
 drawCell :: Game -> Int -> Int -> Maybe CursorPosition -> Widget GameAppResourceName
-drawCell game x y cp = tileColor (grid game) x y $ drawCursorBorder cp x y $ C.center $  tileStr (grid game) x y True
+drawCell game x y cp = click $ tileColor (grid game) x y $ drawCursorBorder cp x y $ C.center $  tileStr (grid game) x y True
+  where click = if isNothing cp then id else clickable (Cell x y)
 
 
 
@@ -171,7 +173,7 @@ tileColor grid x y w = case grid !! y !! x of
 
 drawStats :: GameAppState -> Widget GameAppResourceName
 drawStats s = hLimit 40
-  $ vBox [ 
+  $ vBox [
           --  drawConnectionStatus (s ^. connectionDetails), 
            hBox [drawLocalStep (s ^. localGame), drawOpponentStep (s ^. opponentGame)]
          , drawSelected s
@@ -214,12 +216,12 @@ drawConnectionStatus c = withBorderStyle BS.unicodeBold
 drawLocalStep :: Game -> Widget GameAppResourceName
 drawLocalStep g = drawStep n finished "Your Steps:"
   where n        = step g
-        finished = status g 
+        finished = status g
 
 drawOpponentStep :: Game -> Widget GameAppResourceName
 drawOpponentStep g = drawStep n finished "Opponent's Steps:"
   where n        = step g
-        finished = status g 
+        finished = status g
 
 drawStep :: Int -> Bool -> String -> Widget GameAppResourceName
 drawStep n finished s = withBorderStyle BS.unicodeBold
@@ -251,6 +253,9 @@ handleGameAppEvent s (AppEvent (MoveEvent move id))
   | id == s ^. connectionDetails . localPlayerID = continue s
   | otherwise = tryOpponentMove s move
 
+handleGameAppEvent s (MouseUp (Cell x y) _ _) =
+  selectCell $ s & cursorPosition . cursorX .~ x & cursorPosition . cursorY .~ y
+
 
 handleGameAppEvent s (VtyEvent (V.EvKey V.KUp [])) =
   continue $
@@ -272,7 +277,13 @@ handleGameAppEvent s (VtyEvent (V.EvKey V.KRight [])) =
     case s ^. cursorPosition . cursorX of
       3         -> s
       a -> s & cursorPosition . cursorX .~ a+1
-handleGameAppEvent s (VtyEvent (V.EvKey V.KEnter [])) =
+handleGameAppEvent s (VtyEvent (V.EvKey V.KEnter [])) = selectCell s
+
+handleGameAppEvent s (VtyEvent (V.EvKey (V.KChar 'q') [])) = halt s
+handleGameAppEvent s ev = continue s
+
+selectCell :: GameAppState -> EventM n (Next GameAppState)
+selectCell s =
     case currentCell s of
       Just r -> continue $ s & ((cursorPosition . selected) ?~ (cp ^. cursorX, cp ^. cursorY))
       Nothing ->
@@ -280,10 +291,6 @@ handleGameAppEvent s (VtyEvent (V.EvKey V.KEnter [])) =
           Just (x, y) -> tryLocalMove s x y
           Nothing -> continue s
       where cp = s ^. cursorPosition
-
-handleGameAppEvent s (VtyEvent (V.EvKey (V.KChar 'q') [])) = halt s
-handleGameAppEvent s ev = continue s
-
 
 tryLocalMove :: GameAppState -> Int -> Int -> EventM n (Next GameAppState)
 tryLocalMove s sx sy =
@@ -299,18 +306,18 @@ tryLocalMove s sx sy =
           | cy < 4 && gr !! (cy + 1) !! cx == sCell = Just Logic.Up
           | otherwise = Nothing
     in case direction of
-      Just a -> let movement = Move sx sy a 
+      Just a -> let movement = Move sx sy a
                     event    = MoveEvent movement (s ^. connectionDetails . localPlayerID) in
         do
-        x <- continue $ checkWinner $ s & localGame .~ move (s ^. localGame) sx sy a & cursorPosition . selected .~ Nothing
+        let x = checkWinner $ s & localGame .~ move (s ^. localGame) sx sy a & cursorPosition . selected .~ Nothing
         liftIO (sendMovementMsg s (show event))
-        return x
+        continue x
       Nothing -> continue s
 
 sendMovementMsg :: GameAppState -> String -> IO ()
 sendMovementMsg s str = do
   -- print str     
-  (s ^. connectionDetails . connectionCallbacks . sendMovementMsgCallBack) str 
+  (s ^. connectionDetails . connectionCallbacks . sendMovementMsgCallBack) str
 
 
 tryOpponentMove :: GameAppState -> Move -> EventM n (Next GameAppState)

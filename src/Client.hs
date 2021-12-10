@@ -18,7 +18,7 @@ import Control.Concurrent
     readChan,
     readMVar,
     takeMVar,
-    writeChan,
+    writeChan, threadDelay
   )
 import qualified Control.Concurrent as GHC.Conc.Sync
 import Control.Exception (handle)
