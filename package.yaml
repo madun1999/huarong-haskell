@@ -26,6 +26,10 @@ dependencies:
 - vty
 - microlens-th
 - microlens
+- bytestring
+- network-bsd
+- network
+- aeson
 library:
   source-dirs: src
 
