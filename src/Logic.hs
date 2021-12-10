@@ -51,10 +51,14 @@ data Role
 --    if caocao already escape :
 --      update(status)      
 move :: Game -> Int -> Int -> Direction-> Game
-move game x y direction =
-  let newGrid = moveGrid (grid game) y x direction
-      st  = isWin newGrid
-  in  Game {grid = newGrid, step = step game + 1, status = st, name = name game}
+move game x y direction 
+  | x > 0 && gr !! y !! (x - 1) == gr !! y !! x = move game (x-1) y direction
+  | y > 0 && gr !! (y - 1) !! x == gr !! y !! x = move game x (y-1) direction
+  | otherwise = 
+          let newGrid = moveGrid (grid game) y x direction
+              st  = isWin newGrid
+          in  Game {grid = newGrid, step = step game + 1, status = st, name = name game}
+  where gr = grid game
 
 --the initial board
 initialPosition :: Game
@@ -136,7 +140,7 @@ moveCaocao curGrid x y direction =  do
                                           Up ->  if x - 1 >= 0 && y + 1 < 4 && curGrid !! (x - 1) !!y == Nothing && curGrid !! (x - 1) !!(y + 1) == Nothing then moveCaocaoUp curGrid x y else curGrid
                                           Left -> if x + 1 < 5 && y - 1 >= 0 && curGrid !! x !!(y - 1) == Nothing && curGrid !! (x + 1) !!(y - 1) == Nothing then moveCaocaoLeft curGrid x y else curGrid
                                           Right -> if x + 1 < 5 && y + 2 <4 && curGrid !! x !!(y + 2) == Nothing && curGrid !! (x + 1) !!(y + 2) == Nothing then moveCaocaoRight curGrid x y else curGrid
-                                          Down -> if x + 1 < 5 && y + 1 <4 && curGrid !!(x + 1) !!(y + 1) == Nothing && curGrid !! (x + 1) !!y == Nothing then moveCaocaoDown curGrid x y else curGrid
+                                          Down -> if x + 2 < 5 && y + 1 <4 && curGrid !!(x + 2) !!(y + 1) == Nothing && curGrid !! (x + 2) !!y == Nothing then moveCaocaoDown curGrid x y else curGrid
                                     else curGrid       
 
 
@@ -152,8 +156,8 @@ moveCaocao curGrid x y direction =  do
 
 moveFourDown :: Grid -> Int -> Int -> Tile -> Grid
 moveFourDown curGrid x y curRole   = do
-                                    let tmp1 = curGrid & element (x + 1) . element y .~ curRole
-                                    let tmp2 = tmp1 & element (x - 1). element y .~ Nothing
+                                    let tmp1 = curGrid & element (x + 2) . element y .~ curRole
+                                    let tmp2 = tmp1 & element x. element y .~ Nothing
                                     tmp2
 
 moveFourLeft :: Grid -> Int -> Int -> Tile -> Grid
@@ -186,7 +190,7 @@ moveFour curGrid x y direction =  do
                                           Up -> if x -1 >= 0 && curGrid !! (x-1) !!y == Nothing  then moveFourUp curGrid x y curRole else curGrid
                                           Left -> if x + 1 < 5 && y - 1 >= 0 && curGrid !! x !!(y - 1) == Nothing && curGrid !! (x + 1) !!(y - 1) == Nothing then moveFourLeft curGrid x y curRole else curGrid
                                           Right -> if x + 1 < 5 && y + 1 < 4 && curGrid !! x !!(y + 1) == Nothing && curGrid !! (x + 1) !!(y + 1) == Nothing then moveFourRight curGrid x y curRole else curGrid
-                                          Down -> if x + 1 <5 && curGrid !! (x+1) !!y == Nothing  then moveFourDown curGrid x y curRole else curGrid
+                                          Down -> if x + 2 <5 && curGrid !! (x+2) !!y == Nothing  then moveFourDown curGrid x y curRole else curGrid
                                     else curGrid        
 
 -- >>> moveFour (grid initialPosition) 0 0 RightSide
@@ -255,8 +259,8 @@ moveGuanLeft curGrid x y = do
 
 moveGuanRight :: Grid -> Int -> Int  -> Grid
 moveGuanRight curGrid x y = do
-                                    let tmp1 = curGrid & element x . element (y + 1) .~ Just Guanyu
-                                    let tmp2 = tmp1 & element x. element y .~ Nothing
+                                    let tmp1 = curGrid & element x . element (y + 2) .~ Just Guanyu
+                                    let tmp2 = tmp1 & element x. element y  .~ Nothing
                                     tmp2
 
 moveGuanUp :: Grid -> Int -> Int  -> Grid
