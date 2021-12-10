@@ -57,12 +57,12 @@ data CursorPosition = CursorPosition
 initialCursorPosition :: CursorPosition
 initialCursorPosition = CursorPosition 0 0 Nothing
 
-data DuelStatus = InProgress | LocalWin | LocalLose | Tie
+data DuelStatus = InProgress | LocalWin | LocalLose | Tie deriving (Eq, Show)
 
 data Move = Move
   { _x:: Int
-  , _y :: Int 
-  , _direction :: Logic.Direction 
+  , _y :: Int
+  , _direction :: Logic.Direction
   } deriving (Eq, Show)
 
 -- Event
@@ -126,15 +126,15 @@ drawCell game x y cp = tileColor (grid game) x y $  C.center $ drawCursorBorder 
 
 drawCursorBorder :: Maybe CursorPosition -> Int -> Int -> Widget GameAppResourceName -> Widget GameAppResourceName
 drawCursorBorder (Just cp) x y
-    | (cp ^. cursorX == x) && (cp ^. cursorY == y) = B.border
+    | cp ^. cursorX == x && cp ^. cursorY == y = B.border
     | otherwise              = padAll 1
 drawCursorBorder Nothing x y = padAll 1
 
 
 tileStr :: Grid -> Int -> Int -> Bool -> Widget n
 tileStr grid x y hide =
-  if  hide && (((y /= 0) && ((grid !! (y-1) !! x) == (grid !! y !! x)))
-    || ((x /= 0) && ((grid !! y !! (x-1)) == (grid !! y !! x))))
+  if  hide && ((y /= 0) && ((grid !! (y-1) !! x) == (grid !! y !! x))
+    || (x /= 0) && ((grid !! y !! (x-1)) == (grid !! y !! x)))
   then
     str " "
   else
@@ -153,16 +153,16 @@ tileStr grid x y hide =
 
 tileColor :: Grid -> Int -> Int -> Widget n -> Widget n
 tileColor grid x y w = case grid !! y !! x of
-  Just Zhangfei -> withAttr zhangfeiAttr $ w
-  Just Caocao -> withAttr caocaoAttr $ w
-  Just Machao -> withAttr machaoAttr $ w
-  Just Zhaoyun -> withAttr zhaoyunAttr $ w
-  Just Guanyu -> withAttr guanyuAttr $ w
-  Just Huangzhong -> withAttr huangzhongAttr $ w
-  Just Zu1 -> withAttr zu1Attr $ w
-  Just Zu2 -> withAttr zu2Attr $ w
-  Just Zu3 -> withAttr zu3Attr $ w
-  Just Zu4 -> withAttr zu4Attr $ w
+  Just Zhangfei -> withAttr zhangfeiAttr w
+  Just Caocao -> withAttr caocaoAttr w
+  Just Machao -> withAttr machaoAttr w
+  Just Zhaoyun -> withAttr zhaoyunAttr w
+  Just Guanyu -> withAttr guanyuAttr w
+  Just Huangzhong -> withAttr huangzhongAttr w
+  Just Zu1 -> withAttr zu1Attr w
+  Just Zu2 -> withAttr zu2Attr w
+  Just Zu3 -> withAttr zu3Attr w
+  Just Zu4 -> withAttr zu4Attr w
   Nothing -> w
 
 drawStats :: GameAppState -> Widget GameAppResourceName
@@ -230,47 +230,44 @@ drawGameOver Tie = C.hCenter $ str "Tie!"
 
 handleGameAppEvent :: GameAppState -> BrickEvent GameAppResourceName GameAppEvent -> EventM GameAppResourceName (Next GameAppState)
 
--- handleEvent s (AppEvent (ConnectionSuccess c)) = error "Not implemented"
--- handleEvent s (AppEvent (ConnectionFailed e)) = continue (s & connectionState .~ Error e)
+handleGameAppEvent s (AppEvent (OpponentMove move)) = error "Not "
+
 
 handleGameAppEvent s (VtyEvent (V.EvKey V.KUp [])) =
   continue $
     case s ^. cursorPosition . cursorY of
       0         -> s
-      a -> s & cursorPosition . cursorY .~ (a-1)
+      a -> s & cursorPosition . cursorY .~ a-1
 handleGameAppEvent s (VtyEvent (V.EvKey V.KDown [])) =
   continue $
     case s ^. cursorPosition . cursorY of
       4         -> s
-      a -> s & cursorPosition . cursorY .~ (a+1)
+      a -> s & cursorPosition . cursorY .~ a+1
 handleGameAppEvent s (VtyEvent (V.EvKey V.KLeft [])) =
   continue $
     case s ^. cursorPosition . cursorX of
       0         -> s
-      a -> s & cursorPosition . cursorX .~ (a-1)
+      a -> s & cursorPosition . cursorX .~ a-1
 handleGameAppEvent s (VtyEvent (V.EvKey V.KRight [])) =
   continue $
     case s ^. cursorPosition . cursorX of
       3         -> s
-      a -> s & cursorPosition . cursorX .~ (a+1)
+      a -> s & cursorPosition . cursorX .~ a+1
 handleGameAppEvent s (VtyEvent (V.EvKey V.KEnter [])) =
     case currentCell s of
       Just r -> continue $ s & ((cursorPosition . selected) ?~ (cp ^. cursorX, cp ^. cursorY))
       Nothing ->
         case s ^. cursorPosition . selected of
-          Just (x, y) -> tryMove s x y
-          Nothing -> continue $ s
+          Just (x, y) -> tryLocalMove s x y
+          Nothing -> continue s
       where cp = s ^. cursorPosition
 
 handleGameAppEvent s (VtyEvent (V.EvKey (V.KChar 'q') [])) = halt s
 handleGameAppEvent s ev = continue s
 
-  -- do
-  -- newForm <- handleFormEvent ev (s ^. connectionInfoForm)
-  -- continue (s & connectionInfoForm .~ newForm)
 
-tryMove :: GameAppState -> Int -> Int -> EventM n (Next GameAppState)
-tryMove s sx sy =
+tryLocalMove :: GameAppState -> Int -> Int -> EventM n (Next GameAppState)
+tryLocalMove s sx sy =
   if status $ s ^. localGame then continue s else
     let cx  = s ^. cursorPosition . cursorX
         cy   = s ^. cursorPosition . cursorY
@@ -280,11 +277,11 @@ tryMove s sx sy =
           | cx > 0 && gr !! cy !! (cx - 1) == sCell = Just Logic.Right
           | cy > 0 && gr !! (cy - 1) !! cx == sCell = Just Logic.Down
           | cx < 3 && gr !! cy !! (cx + 1) == sCell = Just Logic.Left
-          | cy < 4 && gr !! (cy + 1) !! cx == sCell = Just Logic.Up 
+          | cy < 4 && gr !! (cy + 1) !! cx == sCell = Just Logic.Up
           | otherwise = Nothing
     in case direction of
       Just a -> let movement = show (Move sx sy a) in do
-        x <- continue $ s & localGame .~ move (s ^. localGame) sx sy a
+        x <- continue $ checkWinner $ s & localGame .~ move (s ^. localGame) sx sy a
         liftIO (sendMovementMsg movement)
         return x
       Nothing -> continue s
@@ -293,6 +290,25 @@ sendMovementMsg :: String -> IO ()
 sendMovementMsg str = do
   print str
   return ()     -- TODO
+
+
+tryOpponentMove :: GameAppState -> Move -> EventM n (Next GameAppState)
+tryOpponentMove s m@(Move x y direction) =
+  if status $ s ^. opponentGame then continue s else
+    let gr        = grid $ s ^. opponentGame in do
+      liftIO (print $ show m) -- Remove this
+      continue $ s & opponentGame .~ move (s ^. localGame) x y direction
+
+checkWinner :: GameAppState -> GameAppState
+checkWinner s
+  | s ^. duelStatus /= InProgress || not (status $ s ^. localGame) || not (status $ s ^. opponentGame)
+    = s
+  | step (s ^. localGame) == step (s ^. opponentGame) = s & duelStatus .~ Tie
+  | step (s ^. localGame) <= step (s ^. opponentGame) = s & duelStatus .~ LocalLose
+  | step (s ^. localGame) >= step (s ^. opponentGame) = s & duelStatus .~ LocalWin
+  | otherwise = s
+
+
 
 currentCell :: GameAppState -> Tile
 currentCell s = gr !! y !! x
