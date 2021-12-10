@@ -149,7 +149,7 @@ procRequest (connsock, clientaddr) chanList handlerfunc = do
 
   handle (\(SomeException _) -> return ()) $
     flip fix (Nothing, Nothing, chanList) $ \loop (room, reader, list) -> do
-      line <- fmap init (hGetLine connhdl)
+      line <- hGetLine connhdl
       wrapLogfunc line
 
       case line of

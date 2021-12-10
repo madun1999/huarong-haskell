@@ -24,7 +24,7 @@ import Lens.Micro ((^.), (&), (.~))
 import Graphics.Vty (black, yellow, white, red)
 import Data.Text (empty)
 import Control.Monad.IO.Class (MonadIO(liftIO))
-import Network (Connection)
+import Client (Connection)
 
 -------------- Menu Types ----------------
 
