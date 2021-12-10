@@ -28,7 +28,7 @@ data Game = Game
 
 data Direction
     = Up | Left | Right | Down
-    deriving (Eq, Show)
+    deriving (Eq, Show, Read)
 
 -- different roles will take different numbers of tiles
 data Role
@@ -68,6 +68,19 @@ initialPosition = Game {
           [Just Zhaoyun,Just Guanyu,Just Guanyu,Just Huangzhong],
           [Just Zhaoyun,Just Zu2,Just Zu3,Just Huangzhong],
           [Just Zu1,Nothing,Nothing,Just Zu4]]
+  , step = 0
+  , status = False
+  , name = "player"
+}
+
+-- a simple initial board 
+initialPositionSimple :: Game
+initialPositionSimple = Game {
+  grid = [[Nothing,Just Caocao,Just Caocao,Nothing],
+          [Nothing,Just Caocao,Just Caocao,Nothing],
+          [Nothing,Nothing,Nothing,Nothing],
+          [Nothing,Nothing,Nothing,Nothing],
+          [Nothing,Nothing,Nothing,Nothing]]
   , step = 0
   , status = False
   , name = "player"

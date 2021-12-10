@@ -4,7 +4,7 @@ module TUI.GameApp where
 
 import Logic
   ( Game(..), initialPosition, numRows, numCols, Role (..)
-  , Grid, Tile, move, Direction (..)
+  , Grid, Tile, move, Direction (..), initialPositionSimple
   )
 
 import Brick
@@ -27,7 +27,7 @@ import qualified Brick.Widgets.Border.Style as BS
 import qualified Brick.Widgets.Center as C
 import qualified Brick.Util as U
 import qualified Graphics.Vty as V
-import Client (Connection, connectionStatus, ConnectionStatus (..))
+import Client (ConnectionDetails, connectionStatus, ConnectionStatus (..), tableID, localPlayerID, connectionCallbacks, sendMovementMsgCallBack)
 import Graphics.Vty
   ( black, cyan, red, blue, yellow, magenta
   , green, brightBlue, brightCyan, brightGreen, brightYellow, brightMagenta
@@ -40,7 +40,7 @@ import Control.Monad.IO.Class (MonadIO(liftIO))
 
 -- States
 data GameAppState = GameAppState {
-    _connection :: Connection
+    _connectionDetails :: ConnectionDetails
   , _cursorPosition :: CursorPosition
   , _localGame :: Game
   , _opponentGame :: Game
@@ -63,11 +63,15 @@ data Move = Move
   { _x:: Int
   , _y :: Int
   , _direction :: Logic.Direction
-  } deriving (Eq, Show)
+  } deriving (Eq, Show, Read)
 
 -- Event
 
-data GameAppEvent = OpponentMove Move
+type PlayerID = Int
+
+data GameAppEvent =
+  MoveEvent Move PlayerID
+  deriving (Eq, Show, Read)
 
 -- Resource
 data GameAppResourceName =
@@ -80,9 +84,11 @@ makeLenses ''CursorPosition
 
 ---------- Initial State for the GameApp --------------
 
-initialGameAppState :: Connection -> GameAppState
+initialGameAppState :: ConnectionDetails -> GameAppState
 initialGameAppState c = GameAppState c initialCursorPosition initialPosition initialPosition InProgress
 
+initialSimpleGameState :: ConnectionDetails -> GameAppState
+initialSimpleGameState c = GameAppState c initialCursorPosition initialPositionSimple initialPositionSimple InProgress
 
 ---- Brick App ----
 
@@ -101,11 +107,12 @@ gameApp = App { appDraw = drawGameApp
 
 ---- Brick draw App ----
 drawGameApp :: GameAppState -> [Widget GameAppResourceName]
-drawGameApp s = [hBox [
+drawGameApp s = [vBox [ str $ "Table ID: " ++ (s ^. connectionDetails . tableID) ,
+  hBox [
   drawLocalBoard s,
   drawStats s,
   drawOpponentBoard s
-  ]]
+  ]]]
 
 
 drawLocalBoard :: GameAppState -> Widget GameAppResourceName
@@ -167,7 +174,7 @@ tileColor grid x y w = case grid !! y !! x of
 
 drawStats :: GameAppState -> Widget GameAppResourceName
 drawStats s = hLimit 40
-  $ vBox [ drawConnectionStatus (s ^. connection)
+  $ vBox [ drawConnectionStatus (s ^. connectionDetails)
          , hBox [drawLocalStep (step $ s ^. localGame), drawOpponentStep (step $ s ^. opponentGame)]
          , drawSelected s
          , padTop (Pad 2) $ drawGameOver (s ^. duelStatus)
@@ -198,7 +205,7 @@ drawInstructions = padTop (Pad 2) $ vBox
   , str "q: quit"
   ]
 
-drawConnectionStatus :: Connection -> Widget GameAppResourceName
+drawConnectionStatus :: ConnectionDetails -> Widget GameAppResourceName
 drawConnectionStatus c = withBorderStyle BS.unicodeBold
                          $ B.borderWithLabel (str "Connection:")
                          $ C.center
@@ -210,7 +217,7 @@ drawLocalStep :: Int -> Widget GameAppResourceName
 drawLocalStep n = drawStep n "Your Steps:"
 
 drawOpponentStep :: Int -> Widget GameAppResourceName
-drawOpponentStep n = drawStep n "Opponent Steps:"
+drawOpponentStep n = drawStep n "Opponent's Steps:"
 
 drawStep :: Int -> String -> Widget GameAppResourceName
 drawStep n s = withBorderStyle BS.unicodeBold
@@ -226,11 +233,21 @@ drawGameOver LocalLose = C.hCenter $ str "You Lose.."
 drawGameOver Tie = C.hCenter $ str "Tie!"
 
 
+---------- Create Events from Server Message ----------
+
+gameMessageEvent :: String -> GameAppEvent
+gameMessageEvent s = read s :: GameAppEvent
+-- gameMessageEvent :: String -> IO GameAppEvent
+-- gameMessageEvent s = print s >> return (MoveEvent (Move 1 2 Logic.Left) 1)
+
+
 ---------- Handle Brick Events ------------
 
 handleGameAppEvent :: GameAppState -> BrickEvent GameAppResourceName GameAppEvent -> EventM GameAppResourceName (Next GameAppState)
 
-handleGameAppEvent s (AppEvent (OpponentMove move)) = error "Not "
+handleGameAppEvent s (AppEvent (MoveEvent move id))
+  | id == s ^. connectionDetails . localPlayerID = continue s
+  | otherwise = tryOpponentMove s move
 
 
 handleGameAppEvent s (VtyEvent (V.EvKey V.KUp [])) =
@@ -280,24 +297,26 @@ tryLocalMove s sx sy =
           | cy < 4 && gr !! (cy + 1) !! cx == sCell = Just Logic.Up
           | otherwise = Nothing
     in case direction of
-      Just a -> let movement = show (Move sx sy a) in do
+      Just a -> let movement = Move sx sy a 
+                    event    = MoveEvent movement (s ^. connectionDetails . localPlayerID) in
+        do
         x <- continue $ checkWinner $ s & localGame .~ move (s ^. localGame) sx sy a
-        liftIO (sendMovementMsg movement)
+        liftIO (sendMovementMsg s (show event))
         return x
       Nothing -> continue s
 
-sendMovementMsg :: String -> IO ()
-sendMovementMsg str = do
-  print str
-  return ()     -- TODO
+sendMovementMsg :: GameAppState -> String -> IO ()
+sendMovementMsg s str = do
+  -- print str     
+  (s ^. connectionDetails . connectionCallbacks . sendMovementMsgCallBack) str 
 
 
 tryOpponentMove :: GameAppState -> Move -> EventM n (Next GameAppState)
 tryOpponentMove s m@(Move x y direction) =
   if status $ s ^. opponentGame then continue s else
     let gr        = grid $ s ^. opponentGame in do
-      liftIO (print $ show m) -- Remove this
-      continue $ s & opponentGame .~ move (s ^. localGame) x y direction
+      -- liftIO (print $ show m) 
+      continue $ s & opponentGame .~ move (s ^. opponentGame) x y direction
 
 checkWinner :: GameAppState -> GameAppState
 checkWinner s

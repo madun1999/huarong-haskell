@@ -18,13 +18,13 @@ import qualified Brick.Widgets.Border as B
 import qualified Brick.Widgets.Border.Style as BS
 import qualified Brick.Widgets.Center as C
 import qualified Graphics.Vty as V
-import Brick.Forms (newForm, Form, editTextField, renderForm, invalidFormInputAttr, focusedFormInputAttr, handleFormEvent, (@@=))
+import Brick.Forms (newForm, Form (formState), editTextField, renderForm, invalidFormInputAttr, focusedFormInputAttr, handleFormEvent, (@@=))
 import Lens.Micro.TH (makeLenses)
 import Lens.Micro ((^.), (&), (.~))
 import Graphics.Vty (black, yellow, white, red)
-import Data.Text (empty)
+import Data.Text (empty, null)
 import Control.Monad.IO.Class (MonadIO(liftIO))
-import Client (Connection)
+import Client (ConnectionDetails, tableID, connectionCallbacks, sendCreateRoomMsgCallBack, sendJoinRoomMsgCallBack, localPlayerID)
 
 -------------- Menu Types ----------------
 
@@ -33,21 +33,22 @@ data ConnectionState =
   Idle | Connecting | Error String | Success
   deriving (Show)
 
-data ConnectionInfo = ConnectionInfo {
+data ConnectionInfoText = ConnectionInfoText {
     _serverIP :: T.Text
   , _tableID :: T.Text
 } deriving (Show)
 
 data MenuState = MenuState {
-    _connectionInfo :: ConnectionInfo
-  , _connectionState :: ConnectionState
-  , _connectionInfoForm :: Form ConnectionInfo MenuEvent MenuResourceName
+    _connectionState :: ConnectionState
+  , _connectionInfoForm :: Form ConnectionInfoText MenuEvent MenuResourceName
+  , _connectionDetails :: ConnectionDetails
 }
 
 -- Event
 
 
-data MenuEvent = ConnectionSuccess Connection | ConnectionFailed String
+data MenuEvent = ConnectionEvent String
+  deriving (Show, Read)
 
 -- Resource
 data MenuResourceName =
@@ -55,14 +56,14 @@ data MenuResourceName =
   deriving (Eq, Ord, Show)
 
 -- Convenient Lenses
-makeLenses ''ConnectionInfo
+makeLenses ''ConnectionInfoText
 makeLenses ''MenuState
 
 ---------- Initial State for the menu --------------
 
-initialMenuState :: MenuState
-initialMenuState = MenuState ci Idle (makeConnectionForm ci)
-                    where ci = ConnectionInfo empty empty
+initialMenuState :: ConnectionDetails -> MenuState
+initialMenuState cd = MenuState Idle (makeConnectionForm ci) cd
+                    where ci = ConnectionInfoText empty empty
 
 
 ---------- Brick App ------------
@@ -84,12 +85,19 @@ menuAttrMap = attrMap V.defAttr
   , (invalidFormInputAttr, white `on` red)
   ]
 
+---------- Create Events from Server Message ----------
+
+menuMessageEvent :: String -> MenuEvent
+menuMessageEvent s = ConnectionEvent s
+
 ---------- Handle Brick Events ------------
 
 handleEvent :: MenuState -> BrickEvent MenuResourceName MenuEvent -> EventM MenuResourceName (Next MenuState)
 
-handleEvent s (AppEvent (ConnectionSuccess c)) = error "Not implemented"
-handleEvent s (AppEvent (ConnectionFailed e)) = continue (s & connectionState .~ Error e)
+handleEvent s (AppEvent (ConnectionEvent str))
+  | Prelude.null str = continue (s & connectionState .~ Error "1")
+  | otherwise = halt (s & connectionDetails . Client.tableID .~ str)
+
 
 handleEvent s (VtyEvent (V.EvKey V.KEnter [])) = connectToTable s
 handleEvent s (VtyEvent (V.EvKey (V.KChar 'q') [])) = halt s
@@ -99,23 +107,31 @@ handleEvent s ev = do
 
 
 connectToTable :: MenuState -> EventM MenuResourceName (Next MenuState)
-connectToTable s = liftIO (requestConnectToTable (s ^. connectionInfo)) >> continue (s & connectionState .~ Connecting)
+connectToTable s = do 
+  s1 <- liftIO (requestConnectToTable s) 
+  continue (s1 & connectionState .~ Connecting)
 
 
 
-requestConnectToTable :: connectionInfo -> IO ()
-requestConnectToTable ci = return () -- TODO
+requestConnectToTable :: MenuState -> IO MenuState
+requestConnectToTable s
+  | Data.Text.null tID = ccb ^. sendCreateRoomMsgCallBack >> return (s & connectionDetails . localPlayerID .~ 0)
+  | otherwise  = (ccb ^. sendJoinRoomMsgCallBack) (T.unpack tID) >> return (s & connectionDetails . localPlayerID .~ 1)
+  where tID = formState (s ^. connectionInfoForm) ^. TUI.Menu.tableID
+        cd  = s ^. connectionDetails
+        ccb = cd ^. connectionCallbacks
 
 ---------- Brick Drawing --------------
 
 drawMenu :: MenuState -> [Widget MenuResourceName]
 drawMenu s = [vBox
               [
-                C.hCenter $ str "Connect to Table"
+                C.hCenter $ str "Connect to a Table"
               , vLimit 1 $ drawStatus s
               , padTop (Pad 2) $ C.center $ renderForm $ s ^. connectionInfoForm
               , str "Press Tab to switch fields"
               , str "Press enter to confirm"
+              , str "Leave Table ID blank to create a new room"
               , str "Press q to exit"
               ]
             ]
@@ -128,9 +144,9 @@ drawStatus s = case s ^. connectionState of
   Success -> str "Success fully connected to table"
 
 ------- Brick Input form creation -----------
-makeConnectionForm :: ConnectionInfo -> Form ConnectionInfo MenuEvent MenuResourceName
+makeConnectionForm :: ConnectionInfoText -> Form ConnectionInfoText MenuEvent MenuResourceName
 makeConnectionForm =
     newForm [
           (str "Server IP: " <+>) @@= editTextField serverIP MenuServerIPField (Just 1)
-        , (str "Table ID: " <+>) @@= editTextField tableID MenuTableIDField (Just 1)
+        , (str "Table ID: " <+>) @@= editTextField TUI.Menu.tableID MenuTableIDField (Just 1)
     ]

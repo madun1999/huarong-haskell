@@ -93,23 +93,29 @@ instance FromJSON Info
 
 instance ToJSON Info
 
-data Connection = Connection
+data ConnectionDetails = ConnectionDetails
   { _serverIP :: String,
     _tableID :: String,
-    _connection :: (),
-    _localPlayerID :: Int,
+    _connectionCallbacks :: ConnectionCallBacks,
+    _localPlayerID :: Int,        -- Table Creator : 0, Joined : 1
     _connectionStatus :: ConnectionStatus
   }
-  deriving (Show)
+data ConnectionCallBacks = ConnectionCallBacks
+  { _sendMovementMsgCallBack :: String -> IO ()
+  , _sendJoinRoomMsgCallBack :: String -> IO ()
+  , _sendCreateRoomMsgCallBack :: IO ()
+  , _closeClientCallBack :: IO ()
+  }
 
-data ConnectionStatus = Good | Disconnected deriving (Show)
+data ConnectionStatus = Good | Disconnected deriving (Show, Read)
 
 -- Convenient Lenses
-makeLenses ''Connection
+makeLenses ''ConnectionDetails
+makeLenses ''ConnectionCallBacks
 
 -- For testing
-dummyConnection =
-  Connection "" "" () 0 Good
+dummyCallBacks = ConnectionCallBacks print print (print "createRoom") (print "closeClient")
+dummyConnection = ConnectionDetails "" "" dummyCallBacks 0 Good
 
 initConnection :: Network.Socket.Info.HostName -> Network.Socket.Info.ServiceName -> IO GHC.IO.Handle.Types.Handle
 initConnection hostname port = do
@@ -146,7 +152,7 @@ sendCreateRoomMsg handle = do
 -- networkCallback msg = do
 --   return ()
 
-startClient :: ([Char] -> IO ()) -> (String -> IO ()) -> IO (String -> IO (), String -> IO (), IO (), IO ())
+startClient :: ([Char] -> IO ()) -> (String -> IO ()) -> IO ConnectionDetails
 startClient networkCallback roomIdCallback = do
   handle <- initConnection "localhost" "80"
   reader <- forkIO $
@@ -154,14 +160,17 @@ startClient networkCallback roomIdCallback = do
       line <- hGetLine handle
       let res = fromMaybe (Response {resService = "default", resPayload = ""}) (decode $ packString line :: Maybe Response)
       case resService res of
-        "move" -> networkCallback line
+        "move" -> networkCallback $ resPayload res
         "createRoom" -> do
           let info = fromMaybe (Info {status = False, detail = ""}) (decode $ packString (resPayload res) :: Maybe Info)
           roomIdCallback $ detail info
+        "Info" -> do
+          let info = fromMaybe (Info {status = False, detail = ""}) (decode $ packString (resPayload res) :: Maybe Info)
+          roomIdCallback $ drop 5 $ detail info
         _ -> do return ()
       loop
-
-  return (sendMovementMsg handle, sendJoinRoomMsg handle, sendCreateRoomMsg handle, closeClient handle reader)
+  let connectionCallbacks = ConnectionCallBacks (sendMovementMsg handle) (sendJoinRoomMsg handle) (sendCreateRoomMsg handle) (closeClient handle reader)
+  return $ ConnectionDetails "" "" connectionCallbacks 0 Good
 
 closeClient :: GHC.IO.Handle.Types.Handle -> GHC.Conc.Sync.ThreadId -> IO ()
 closeClient handle reader = do
