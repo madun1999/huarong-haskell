@@ -42,7 +42,6 @@ data Role
     | Zu4
     deriving (Eq, Show)
 
-makeLenses ''Game
 
 -- grid[x][y] stands for the top left tile of current character
 -- if movement is valid :

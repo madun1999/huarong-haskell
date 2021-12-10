@@ -2,7 +2,10 @@
 
 module TUI.GameApp where
 
-import Logic (Game(..), initialPosition, numRows, numCols, Role (..))
+import Logic
+  ( Game(..), initialPosition, numRows, numCols, Role (..)
+  , Grid, Tile, move, Direction (..)
+  )
 
 import Brick
   ( App(..), AttrMap, BrickEvent(..), EventM, Next, Widget
@@ -17,7 +20,7 @@ import Brick
   )
 
 import Lens.Micro.TH (makeLenses)
-import Lens.Micro ((^.), (&), (.~))
+import Lens.Micro ((^.), (&), (.~), (?~))
 import Brick.BChan (newBChan, writeBChan)
 import qualified Brick.Widgets.Border as B
 import qualified Brick.Widgets.Border.Style as BS
@@ -29,6 +32,9 @@ import Graphics.Vty
   ( black, cyan, red, blue, yellow, magenta
   , green, brightBlue, brightCyan, brightGreen, brightYellow, brightMagenta
   )
+import Control.Monad.IO.Class (MonadIO(liftIO))
+
+
 
 -------------- Menu Types ----------------
 
@@ -41,18 +47,23 @@ data GameAppState = GameAppState {
   , _duelStatus :: DuelStatus
 }
 
-data CursorPosition = CursorPosition 
+data CursorPosition = CursorPosition
   {
     _cursorX :: Int
-  , _cursorY :: Int 
+  , _cursorY :: Int
+  , _selected :: Maybe (Int, Int)
   }
 
 initialCursorPosition :: CursorPosition
-initialCursorPosition = CursorPosition 0 0
+initialCursorPosition = CursorPosition 0 0 Nothing
 
 data DuelStatus = InProgress | LocalWin | LocalLose | Tie
 
-type Move = ()
+data Move = Move
+  { _x:: Int
+  , _y :: Int 
+  , _direction :: Logic.Direction 
+  } deriving (Eq, Show)
 
 -- Event
 
@@ -65,6 +76,7 @@ data GameAppResourceName =
 
 -- Convenient Lenses
 makeLenses ''GameAppState
+makeLenses ''CursorPosition
 
 ---------- Initial State for the GameApp --------------
 
@@ -104,38 +116,29 @@ drawOpponentBoard :: GameAppState -> Widget GameAppResourceName
 drawOpponentBoard s = B.borderWithLabel (str "Opponent's Game") $ drawGrid (s ^. opponentGame) Nothing
 
 drawGrid :: Game -> Maybe CursorPosition -> Widget GameAppResourceName
-drawGrid game cp = vBox [hBox [ drawCell game x y | y <-[0..numCols -1]] | x <- [0..numRows -1]]
-  where
-    drawCell game x y = tileColor (grid game) x y $  C.hCenter $   drawCursorBorder cp x y $ tileStr (grid game) x y
+drawGrid game cp = vBox [hBox [ drawCell game x y cp | x <-[0..numCols -1]] | y <- [0..numRows -1]]
+
+
+drawCell :: Game -> Int -> Int -> Maybe CursorPosition -> Widget GameAppResourceName
+drawCell game x y cp = tileColor (grid game) x y $  C.center $ drawCursorBorder cp x y $ tileStr (grid game) x y True
 
 
 
 drawCursorBorder :: Maybe CursorPosition -> Int -> Int -> Widget GameAppResourceName -> Widget GameAppResourceName
-drawCursorBorder (Just (CursorPosition cx cy)) x y 
-    | (cx == x) && (cy == y) = B.border 
+drawCursorBorder (Just cp) x y
+    | (cp ^. cursorX == x) && (cp ^. cursorY == y) = B.border
     | otherwise              = padAll 1
 drawCursorBorder Nothing x y = padAll 1
 
--- drawInfo :: GameAppState -> Widget GameAppResourceName
--- drawInfo s = vBox
---   [ drawConnectionInfo $ s ^. connection
---   , drawWinLoss $ s ^. duelStatus
---   ]
---   where drawConnectionInfo c = str $ show $ c ^. connectionStatus
---         drawWinLoss ds = str $ case ds of
---                                   InProgress -> ""
---                                   LocalWin -> "You win!"
---                                   LocalLose -> "You lost."
---                                   Tie -> "Tie."
 
-tileStr :: [[Maybe Role]] -> Int -> Int -> Widget n
-tileStr grid x y =
-  if    ((x /= 0) && ((grid !! (x-1) !! y) == (grid !! x !! y)))
-    || ((y /= 0) && ((grid !! x !! (y-1)) == (grid !! x !! y)))
+tileStr :: Grid -> Int -> Int -> Bool -> Widget n
+tileStr grid x y hide =
+  if  hide && (((y /= 0) && ((grid !! (y-1) !! x) == (grid !! y !! x)))
+    || ((x /= 0) && ((grid !! y !! (x-1)) == (grid !! y !! x))))
   then
     str " "
   else
-    str $ case grid !! x !! y of
+    str $ case grid !! y !! x of
       Just Zhangfei -> "张飞"
       Just Caocao -> "曹操"
       Just Machao -> "马超"
@@ -148,8 +151,8 @@ tileStr grid x y =
       Just Zu4 -> "卒"
       Nothing -> " "
 
-tileColor :: [[Maybe Role]] -> Int -> Int -> Widget n -> Widget n
-tileColor grid x y w = case grid !! x !! y of
+tileColor :: Grid -> Int -> Int -> Widget n -> Widget n
+tileColor grid x y w = case grid !! y !! x of
   Just Zhangfei -> withAttr zhangfeiAttr $ w
   Just Caocao -> withAttr caocaoAttr $ w
   Just Machao -> withAttr machaoAttr $ w
@@ -165,14 +168,30 @@ tileColor grid x y w = case grid !! x !! y of
 drawStats :: GameAppState -> Widget GameAppResourceName
 drawStats s = hLimit 40
   $ vBox [ drawConnectionStatus (s ^. connection)
-         , drawLocalStep (step $ s ^. localGame) 
-         , drawOpponentStep (step $ s ^. opponentGame)
+         , hBox [drawLocalStep (step $ s ^. localGame), drawOpponentStep (step $ s ^. opponentGame)]
+         , drawSelected s
          , padTop (Pad 2) $ drawGameOver (s ^. duelStatus)
          , drawInstructions
          ]
 
+drawSelected :: GameAppState -> Widget GameAppResourceName
+drawSelected s = case s ^. cursorPosition . selected of
+  Just (cx, cy) -> withBorderStyle BS.unicodeBold
+                      $ B.borderWithLabel (str "Selected:")
+                      $ C.center
+                      $ tileColor (grid game) cx cy $  C.center $ drawCursorBorder Nothing cx cy $ tileStr (grid game) cx cy False
+                      where game = s ^. localGame
+
+  Nothing       -> withBorderStyle BS.unicodeBold
+                         $ B.borderWithLabel (str "Selected:")
+                         $ C.center
+                         $ padAll 1
+                         $ str " "
+
+
+
 drawInstructions :: Widget GameAppResourceName
-drawInstructions = padTop (Pad 2) $ vBox 
+drawInstructions = padTop (Pad 2) $ vBox
   [
     str "arrow: move cursor"
   , str "enter: select/deselect/move"
@@ -182,10 +201,10 @@ drawInstructions = padTop (Pad 2) $ vBox
 drawConnectionStatus :: Connection -> Widget GameAppResourceName
 drawConnectionStatus c = withBorderStyle BS.unicodeBold
                          $ B.borderWithLabel (str "Connection:")
-                         $ C.center 
+                         $ C.center
                          $ case c ^. connectionStatus of
-                            Good -> C.hCenter $ str "Good" 
-                            Disconnected -> C.hCenter $ str "Disconnected" 
+                            Good -> C.hCenter $ str "Good"
+                            Disconnected -> C.hCenter $ str "Disconnected"
 
 drawLocalStep :: Int -> Widget GameAppResourceName
 drawLocalStep n = drawStep n "Your Steps:"
@@ -201,9 +220,9 @@ drawStep n s = withBorderStyle BS.unicodeBold
   $ str $ show n
 
 drawGameOver :: DuelStatus -> Widget GameAppResourceName
-drawGameOver InProgress = emptyWidget 
-drawGameOver LocalWin = C.hCenter $ str "You Win!" 
-drawGameOver LocalLose = C.hCenter $ str "You Lose.." 
+drawGameOver InProgress = emptyWidget
+drawGameOver LocalWin = C.hCenter $ str "You Win!"
+drawGameOver LocalLose = C.hCenter $ str "You Lose.."
 drawGameOver Tie = C.hCenter $ str "Tie!"
 
 
@@ -214,23 +233,73 @@ handleGameAppEvent :: GameAppState -> BrickEvent GameAppResourceName GameAppEven
 -- handleEvent s (AppEvent (ConnectionSuccess c)) = error "Not implemented"
 -- handleEvent s (AppEvent (ConnectionFailed e)) = continue (s & connectionState .~ Error e)
 
-handleGameAppEvent s (VtyEvent (V.EvKey V.KEnter [])) = connectToTable s
+handleGameAppEvent s (VtyEvent (V.EvKey V.KUp [])) =
+  continue $
+    case s ^. cursorPosition . cursorY of
+      0         -> s
+      a -> s & cursorPosition . cursorY .~ (a-1)
+handleGameAppEvent s (VtyEvent (V.EvKey V.KDown [])) =
+  continue $
+    case s ^. cursorPosition . cursorY of
+      4         -> s
+      a -> s & cursorPosition . cursorY .~ (a+1)
+handleGameAppEvent s (VtyEvent (V.EvKey V.KLeft [])) =
+  continue $
+    case s ^. cursorPosition . cursorX of
+      0         -> s
+      a -> s & cursorPosition . cursorX .~ (a-1)
+handleGameAppEvent s (VtyEvent (V.EvKey V.KRight [])) =
+  continue $
+    case s ^. cursorPosition . cursorX of
+      3         -> s
+      a -> s & cursorPosition . cursorX .~ (a+1)
+handleGameAppEvent s (VtyEvent (V.EvKey V.KEnter [])) =
+    case currentCell s of
+      Just r -> continue $ s & ((cursorPosition . selected) ?~ (cp ^. cursorX, cp ^. cursorY))
+      Nothing ->
+        case s ^. cursorPosition . selected of
+          Just (x, y) -> tryMove s x y
+          Nothing -> continue $ s
+      where cp = s ^. cursorPosition
+
 handleGameAppEvent s (VtyEvent (V.EvKey (V.KChar 'q') [])) = halt s
 handleGameAppEvent s ev = continue s
+
   -- do
   -- newForm <- handleFormEvent ev (s ^. connectionInfoForm)
   -- continue (s & connectionInfoForm .~ newForm)
 
+tryMove :: GameAppState -> Int -> Int -> EventM n (Next GameAppState)
+tryMove s sx sy =
+  if status $ s ^. localGame then continue s else
+    let cx  = s ^. cursorPosition . cursorX
+        cy   = s ^. cursorPosition . cursorY
+        gr        = grid $ s ^. localGame
+        sCell     = gr !! sy !! sx
+        direction
+          | cx > 0 && gr !! cy !! (cx - 1) == sCell = Just Logic.Right
+          | cy > 0 && gr !! (cy - 1) !! cx == sCell = Just Logic.Down
+          | cx < 3 && gr !! cy !! (cx + 1) == sCell = Just Logic.Left
+          | cy < 4 && gr !! (cy + 1) !! cx == sCell = Just Logic.Up 
+          | otherwise = Nothing
+    in case direction of
+      Just a -> let movement = show (Move sx sy a) in do
+        x <- continue $ s & localGame .~ move (s ^. localGame) sx sy a
+        liftIO (sendMovementMsg movement)
+        return x
+      Nothing -> continue s
 
-connectToTable :: GameAppState -> EventM GameAppResourceName (Next GameAppState)
-connectToTable s = continue s
-  -- liftIO (requestConnectToTable (s ^. connectionInfo)) >> continue (s & connectionState .~ Connecting)
+sendMovementMsg :: String -> IO ()
+sendMovementMsg str = do
+  print str
+  return ()     -- TODO
 
+currentCell :: GameAppState -> Tile
+currentCell s = gr !! y !! x
+  where gr = grid (s ^. localGame)
+        x  = s ^. cursorPosition . cursorX
+        y  = s ^. cursorPosition . cursorY
 
-
-requestConnectToTable :: connectionInfo -> IO ()
--- TODO
-requestConnectToTable ci = return ()
 
 
 ---------- Brick Attribute Map ----------
