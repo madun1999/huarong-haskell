@@ -132,10 +132,10 @@ moveCaocaoLeft curGrid x y  = do
 
 moveCaocaoRight :: Grid -> Int -> Int ->  Grid
 moveCaocaoRight curGrid x y  = do
-                                    let tmp1 = curGrid & element x . element (y + 1) .~ Just Caocao
-                                    let tmp2 = tmp1 & element (x + 1). element (y + 1) .~ Just Caocao
-                                    let tmp3 = tmp2 & element x. element (y - 1) .~ Nothing
-                                    let tmp4 = tmp3 & element (x + 1). element (y - 1) .~ Nothing
+                                    let tmp1 = curGrid & element x . element (y + 2) .~ Just Caocao
+                                    let tmp2 = tmp1 & element (x + 1). element (y + 2) .~ Just Caocao
+                                    let tmp3 = tmp2 & element x. element (y) .~ Nothing
+                                    let tmp4 = tmp3 & element (x + 1). element (y) .~ Nothing
                                     tmp4
 
 moveCaocaoUp :: Grid -> Int -> Int ->  Grid
