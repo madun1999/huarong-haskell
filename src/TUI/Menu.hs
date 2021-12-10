@@ -104,8 +104,7 @@ connectToTable s = liftIO (requestConnectToTable (s ^. connectionInfo)) >> conti
 
 
 requestConnectToTable :: connectionInfo -> IO ()
--- TODO
-requestConnectToTable ci = return ()
+requestConnectToTable ci = return () -- TODO
 
 ---------- Brick Drawing --------------
 
