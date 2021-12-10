@@ -37,6 +37,7 @@ library
   build-depends:
       base >=4.7 && <5
     , brick
+    , lens
     , microlens
     , microlens-th
     , text
@@ -54,6 +55,7 @@ executable huarong-haskell-exe
       base >=4.7 && <5
     , brick
     , huarong-haskell
+    , lens
     , microlens
     , microlens-th
     , text
@@ -64,6 +66,7 @@ test-suite huarong-haskell-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      TestLogic
       Paths_huarong_haskell
   hs-source-dirs:
       test
@@ -72,6 +75,7 @@ test-suite huarong-haskell-test
       base >=4.7 && <5
     , brick
     , huarong-haskell
+    , lens
     , microlens
     , microlens-th
     , text

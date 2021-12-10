@@ -26,6 +26,7 @@ dependencies:
 - vty
 - microlens-th
 - microlens
+- lens
 library:
   source-dirs: src
 
