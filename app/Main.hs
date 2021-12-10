@@ -18,16 +18,18 @@ import Lib
 import Logic (Direction (..))
 import TUI.GameApp
     ( GameAppEvent (..), Move (Move), gameApp
-    , initialGameAppState, initialSimpleGameState, gameMessageEvent
+    , initialGameAppState, gameMessageEvent
     )
-import TUI.Menu (MenuEvent (..), MenuState, app, initialMenuState, menuMessageEvent, connectionDetails)
+import TUI.Menu (MenuEvent (..), MenuState, app, initialMenuState, menuMessageEvent, connectionDetails, level, connectionInfoForm)
 import qualified TUI.Menu as M (tableID)
 import Lens.Micro ((^.), (&), (.~))
 import qualified Data.Text as T
+import Brick.Forms
+import Data.Text (unpack)
 
 -- main :: IO ()
 -- main = do
---   -- finalState <- defaultMain gameApp (initialGameAppState dummyConnection)
+--   -- finalState <- defaultMain gameApp (initialGameAppState dummyConnection "simple")
 --   (sendMovementMsg, sendJoinRoomMsg, sendCreateRoomMsg, closeClient) <- startClient putStrLn putStrLn
 --   sendCreateRoomMsg
 --   sendMovementMsg "move 1->2"
@@ -54,24 +56,20 @@ main = do
     Just connection -> do
                     let builder = mkVty defaultConfig
                     initialVty <- builder
+                    let levelStr = unpack $ formState (finalMenuState ^. connectionInfoForm) ^. level 
                     finalGameState <-
-                        customMain initialVty builder (Just gameAppChannel) gameApp (initialGameAppState connection)
+                        customMain initialVty builder (Just gameAppChannel) gameApp (initialGameAppState connection levelStr)
                     return ()
+                    
 
 menuToConnection :: MenuState -> Maybe ConnectionDetails
 menuToConnection ms
     | null $ c ^. tableID = Nothing
     | otherwise           = Just c
     where c = ms ^. connectionDetails
--- main :: IO ()
--- main = do 
---     defaultMain gameApp (initialSimpleGameState dummyConnection)
---     return ()
 
 gameMessageDispatch :: BChan GameAppEvent  -> String -> IO ()
 gameMessageDispatch gameChannel s = do
-    --   event <- gameMessageEvent s
-    --   writeBChan gameChannel event
       writeBChan gameChannel $ gameMessageEvent s
       threadDelay 100000
 

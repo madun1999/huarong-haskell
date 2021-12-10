@@ -33,14 +33,14 @@ data ConnectionState =
   Idle | Connecting | Error String | Success
   deriving (Show)
 
-data ConnectionInfoText = ConnectionInfoText {
-    _serverIP :: T.Text
+data FormInfoText = FormInfoText {
+    _level :: T.Text
   , _tableID :: T.Text
 } deriving (Show)
 
 data MenuState = MenuState {
     _connectionState :: ConnectionState
-  , _connectionInfoForm :: Form ConnectionInfoText MenuEvent MenuResourceName
+  , _connectionInfoForm :: Form FormInfoText MenuEvent MenuResourceName
   , _connectionDetails :: ConnectionDetails
 }
 
@@ -56,14 +56,14 @@ data MenuResourceName =
   deriving (Eq, Ord, Show)
 
 -- Convenient Lenses
-makeLenses ''ConnectionInfoText
+makeLenses ''FormInfoText
 makeLenses ''MenuState
 
 ---------- Initial State for the menu --------------
 
 initialMenuState :: ConnectionDetails -> MenuState
 initialMenuState cd = MenuState Idle (makeConnectionForm ci) cd
-                    where ci = ConnectionInfoText empty empty
+                    where ci = FormInfoText empty empty
 
 
 ---------- Brick App ------------
@@ -133,6 +133,7 @@ drawMenu s = [vBox
               , str "Press enter to confirm"
               , str "Leave Table ID blank to create a new room"
               , str "Press q to exit"
+              , str "Available levels: simple, default"
               ]
             ]
 
@@ -144,9 +145,9 @@ drawStatus s = case s ^. connectionState of
   Success -> str "Success fully connected to table"
 
 ------- Brick Input form creation -----------
-makeConnectionForm :: ConnectionInfoText -> Form ConnectionInfoText MenuEvent MenuResourceName
+makeConnectionForm :: FormInfoText -> Form FormInfoText MenuEvent MenuResourceName
 makeConnectionForm =
     newForm [
-          (str "Server IP: " <+>) @@= editTextField serverIP MenuServerIPField (Just 1)
+          (str "Choose Level: " <+>) @@= editTextField level MenuServerIPField (Just 1)
         , (str "Table ID: " <+>) @@= editTextField TUI.Menu.tableID MenuTableIDField (Just 1)
     ]

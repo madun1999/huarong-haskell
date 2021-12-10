@@ -3,8 +3,8 @@
 module TUI.GameApp where
 
 import Logic
-  ( Game(..), initialPosition, numRows, numCols, Role (..)
-  , Grid, Tile, move, Direction (..), initialPositionSimple
+  ( Game(..), numRows, numCols, Role (..)
+  , Grid, Tile, move, Direction (..), selectLevel
   )
 
 import Brick
@@ -33,7 +33,6 @@ import Graphics.Vty
   , green, brightBlue, brightCyan, brightGreen, brightYellow, brightMagenta
   )
 import Control.Monad.IO.Class (MonadIO(liftIO))
-
 
 
 -------------- Menu Types ----------------
@@ -84,11 +83,9 @@ makeLenses ''CursorPosition
 
 ---------- Initial State for the GameApp --------------
 
-initialGameAppState :: ConnectionDetails -> GameAppState
-initialGameAppState c = GameAppState c initialCursorPosition initialPosition initialPosition InProgress
-
-initialSimpleGameState :: ConnectionDetails -> GameAppState
-initialSimpleGameState c = GameAppState c initialCursorPosition initialPositionSimple initialPositionSimple InProgress
+initialGameAppState :: ConnectionDetails -> String -> GameAppState
+initialGameAppState c levelStr = GameAppState c initialCursorPosition g g InProgress
+                      where g = selectLevel levelStr
 
 ---- Brick App ----
 
@@ -127,7 +124,7 @@ drawGrid game cp = vBox [hBox [ drawCell game x y cp | x <-[0..numCols -1]] | y 
 
 
 drawCell :: Game -> Int -> Int -> Maybe CursorPosition -> Widget GameAppResourceName
-drawCell game x y cp = tileColor (grid game) x y $  C.center $ drawCursorBorder cp x y $ tileStr (grid game) x y True
+drawCell game x y cp = tileColor (grid game) x y $ drawCursorBorder cp x y $ C.center $  tileStr (grid game) x y True
 
 
 
@@ -174,8 +171,9 @@ tileColor grid x y w = case grid !! y !! x of
 
 drawStats :: GameAppState -> Widget GameAppResourceName
 drawStats s = hLimit 40
-  $ vBox [ drawConnectionStatus (s ^. connectionDetails)
-         , hBox [drawLocalStep (step $ s ^. localGame), drawOpponentStep (step $ s ^. opponentGame)]
+  $ vBox [ 
+          --  drawConnectionStatus (s ^. connectionDetails), 
+           hBox [drawLocalStep (s ^. localGame), drawOpponentStep (s ^. opponentGame)]
          , drawSelected s
          , padTop (Pad 2) $ drawGameOver (s ^. duelStatus)
          , drawInstructions
@@ -213,21 +211,25 @@ drawConnectionStatus c = withBorderStyle BS.unicodeBold
                             Good -> C.hCenter $ str "Good"
                             Disconnected -> C.hCenter $ str "Disconnected"
 
-drawLocalStep :: Int -> Widget GameAppResourceName
-drawLocalStep n = drawStep n "Your Steps:"
+drawLocalStep :: Game -> Widget GameAppResourceName
+drawLocalStep g = drawStep n finished "Your Steps:"
+  where n        = step g
+        finished = status g 
 
-drawOpponentStep :: Int -> Widget GameAppResourceName
-drawOpponentStep n = drawStep n "Opponent's Steps:"
+drawOpponentStep :: Game -> Widget GameAppResourceName
+drawOpponentStep g = drawStep n finished "Opponent's Steps:"
+  where n        = step g
+        finished = status g 
 
-drawStep :: Int -> String -> Widget GameAppResourceName
-drawStep n s = withBorderStyle BS.unicodeBold
+drawStep :: Int -> Bool -> String -> Widget GameAppResourceName
+drawStep n finished s = withBorderStyle BS.unicodeBold
   $ B.borderWithLabel (str s)
   $ C.hCenter
   $ padAll 1
-  $ str $ show n
+  $ vBox [C.hCenter $ str $ show n, C.hCenter $ str (if finished then "Finished!" else " ")]
 
 drawGameOver :: DuelStatus -> Widget GameAppResourceName
-drawGameOver InProgress = emptyWidget
+drawGameOver InProgress = C.hCenter $ str "In Progress"
 drawGameOver LocalWin = C.hCenter $ str "You Win!"
 drawGameOver LocalLose = C.hCenter $ str "You Lose.."
 drawGameOver Tie = C.hCenter $ str "Tie!"
@@ -300,7 +302,7 @@ tryLocalMove s sx sy =
       Just a -> let movement = Move sx sy a 
                     event    = MoveEvent movement (s ^. connectionDetails . localPlayerID) in
         do
-        x <- continue $ checkWinner $ s & localGame .~ move (s ^. localGame) sx sy a
+        x <- continue $ checkWinner $ s & localGame .~ move (s ^. localGame) sx sy a & cursorPosition . selected .~ Nothing
         liftIO (sendMovementMsg s (show event))
         return x
       Nothing -> continue s
@@ -316,15 +318,15 @@ tryOpponentMove s m@(Move x y direction) =
   if status $ s ^. opponentGame then continue s else
     let gr        = grid $ s ^. opponentGame in do
       -- liftIO (print $ show m) 
-      continue $ s & opponentGame .~ move (s ^. opponentGame) x y direction
+      continue $ checkWinner $ s & opponentGame .~ move (s ^. opponentGame) x y direction
 
 checkWinner :: GameAppState -> GameAppState
 checkWinner s
   | s ^. duelStatus /= InProgress || not (status $ s ^. localGame) || not (status $ s ^. opponentGame)
     = s
   | step (s ^. localGame) == step (s ^. opponentGame) = s & duelStatus .~ Tie
-  | step (s ^. localGame) <= step (s ^. opponentGame) = s & duelStatus .~ LocalLose
-  | step (s ^. localGame) >= step (s ^. opponentGame) = s & duelStatus .~ LocalWin
+  | step (s ^. localGame) <= step (s ^. opponentGame) = s & duelStatus .~ LocalWin
+  | step (s ^. localGame) >= step (s ^. opponentGame) = s & duelStatus .~ LocalLose
   | otherwise = s
 
 

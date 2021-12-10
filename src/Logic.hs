@@ -60,9 +60,13 @@ move game x y direction
           in  Game {grid = newGrid, step = step game + 1, status = st, name = name game}
   where gr = grid game
 
+selectLevel :: String -> Game
+selectLevel "simple"  = simpleLevel
+selectLevel _   = defaultLevel 
+
 --the initial board
-initialPosition :: Game
-initialPosition = Game {
+defaultLevel :: Game
+defaultLevel = Game {
   grid = [[Just Zhangfei,Just Caocao,Just Caocao,Just Machao],
           [Just Zhangfei,Just Caocao,Just Caocao,Just Machao],
           [Just Zhaoyun,Just Guanyu,Just Guanyu,Just Huangzhong],
@@ -74,8 +78,8 @@ initialPosition = Game {
 }
 
 -- a simple initial board 
-initialPositionSimple :: Game
-initialPositionSimple = Game {
+simpleLevel :: Game
+simpleLevel = Game {
   grid = [[Nothing,Just Caocao,Just Caocao,Nothing],
           [Nothing,Just Caocao,Just Caocao,Nothing],
           [Nothing,Nothing,Nothing,Nothing],
