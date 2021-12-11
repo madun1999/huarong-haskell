@@ -33,6 +33,7 @@ dependencies:
 - aeson
 - uuid
 - mtl
+- QuickCheck
 
 library:
   source-dirs: src
@@ -61,7 +62,7 @@ executables:
 
 tests:
   huarong-haskell-test:
-    main:                Test.hs
+    main:                Spec.hs
     source-dirs:         test
     ghc-options:
     - -threaded
